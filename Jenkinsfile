@@ -1,34 +1,59 @@
 pipeline {
+    
+    tools {
+        maven "maven"
+    }
     agent any
-
+    
+    environment {
+        AWS_REGION = "us-east-1"
+        ECR_REPO = "907260787494.dkr.ecr.us-east-1.amazonaws.com/ecomm_store"
+        ECR = "907260787494.dkr.ecr.us-east-1.amazonaws.com"
+        IMAGE_TAG = "latest"
+    }
+    
     stages {
-        stage('Git clone') {
+        stage ('Git Clone') {
             steps {
-               git branch: 'main', url: 'https://github.com/ashokitschool/ashokit_ecomm_store.git'
+                git branch: 'main',
+                credentialsId: 'gitcred',
+                url: 'https://github.com/vishwajeetkore/ecomm_store.git'
             }
         }
         
-        stage('Docker Image'){
-            steps{
-                sh 'docker build -t ashokit/ecomm_store .'
+        stage ('Docker Image') {
+            steps {
+                sh 'docker build -t ecomm_store .'
+                sh 'docker tag ecomm_store:$IMAGE_TAG $ECR_REPO:$IMAGE_TAG'
             }
         }
         
-       stage('Docker Image push'){
-            steps{
-            withCredentials([string(credentialsId: 'docker_pwd', variable: 'docker_pwd')]) {
-                   sh 'docker login -u ashokit -p ${docker_pwd}'
-                   sh 'docker push ashokit/ecomm_store'
-            }
+        stage ('ECR Login'){
+            steps {
+                withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'awscred'
+                    ]]) {
+                        sh ''' 
+                        aws ecr get-login-password --region $AWS_REGION | \
+                        docker login --username AWS --password-stdin $ECR
+                        '''
+                    }
+                
             }
         }
         
-         stage('k8s deployment'){
-            steps{
-             sh 'kubectl apply -f Deployment.yml'
+        stage ('Docker Push') {
+            steps {
+                sh 'docker push $ECR_REPO:$IMAGE_TAG'
             }
-        }  
+        }
         
+        stage ('K8S Deployment') {
+            steps {
+                sh 'kubectl apply -f Deployment.yml'
+            }
+        }
         
     }
 }

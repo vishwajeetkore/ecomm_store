@@ -24,12 +24,6 @@ pipeline {
             }
         }
 
-        stage ('Maven Build') {
-            steps {
-                sh 'mvn clean package'
-            }
-        }
-
         stage ('Docker Build') {
             steps {
                 sh 'docker build -t ecomm_store .'
@@ -57,13 +51,16 @@ pipeline {
             }
         }
 
-        stage ('Deploy Using Helm') {
-            steps {
-                sh '''
-                cd $HELM_CHART
-                helm upgrade --install $HELM_CHART .
-                '''
-            }
-        }
+        stage('Deploy') {
+    steps {
+        sh '''
+        helm uninstall $HELM_CHART || true
+
+        cd $HELM_CHART
+        helm upgrade --install $HELM_CHART . --force
+        '''
+    }
+}
+
     }
 }
